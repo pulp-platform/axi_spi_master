@@ -108,8 +108,22 @@ module axi_spi_master #(
 		localparam FILL_BITS = 7-LOG_BUFFER_DEPTH;
 		
 		assign spi_status = {{FILL_BITS{1'b0}},elements_tx,{FILL_BITS{1'b0}},elements_rx,9'h0,spi_ctrl_status};
-		assign events_o[0] = (((elements_tx==4'b0100) && (elements_tx_old==4'b0101)) || ((elements_tx==4'b0101) && (elements_tx_old==4'b0100)));
+		assign events_o[0] = (((elements_rx==4'b0100) && (elements_rx_old==4'b0101)) || ((elements_tx==4'b0101) && (elements_tx_old==4'b0100)));
 		assign events_o[1] = s_eot;
+
+        always_ff @(posedge s_axi_aclk or negedge s_axi_aresetn)
+        begin
+            if (s_axi_aresetn == 1'b0)
+            begin
+               elements_rx_old <= 'h0;
+               elements_tx_old <= 'h0;
+            end
+            else
+            begin
+               elements_rx_old <= elements_rx;
+               elements_tx_old <= elements_tx;
+            end
+        end
 		
 	spi_master_axi_if #( 
 			.AXI4_ADDRESS_WIDTH(AXI4_ADDRESS_WIDTH), 
