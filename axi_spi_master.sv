@@ -1,7 +1,16 @@
+// Copyright 2015 ETH Zurich and University of Bologna.
+// Copyright and related rights are licensed under the Solderpad Hardware
+// License, Version 0.51 (the “License”); you may not use this file except in
+// compliance with the License.  You may obtain a copy of the License at
+// http://solderpad.org/licenses/SHL-0.51. Unless required by applicable law
+// or agreed to in writing, software, hardware and materials distributed under
+// this License is distributed on an “AS IS” BASIS, WITHOUT WARRANTIES OR
+// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+// specific language governing permissions and limitations under the License.
+
 `define log2(VALUE) ((VALUE) < ( 1 ) ? 0 : (VALUE) < ( 2 ) ? 1 : (VALUE) < ( 4 ) ? 2 : (VALUE) < ( 8 ) ? 3 : (VALUE) < ( 16 )  ? 4 : (VALUE) < ( 32 )  ? 5 : (VALUE) < ( 64 )  ? 6 : (VALUE) < ( 128 ) ? 7 : (VALUE) < ( 256 ) ? 8 : (VALUE) < ( 512 ) ? 9 : (VALUE) < ( 1024 ) ? 10 : (VALUE) < ( 2048 ) ? 11 : (VALUE) < ( 4096 ) ? 12 : (VALUE) < ( 8192 ) ? 13 : (VALUE) < ( 16384 ) ? 14 : (VALUE) < ( 32768 ) ? 15 : (VALUE) < ( 65536 ) ? 16 : (VALUE) < ( 131072 ) ? 17 : (VALUE) < ( 262144 ) ? 18 : (VALUE) < ( 524288 ) ? 19 : (VALUE) < ( 1048576 ) ? 20 : (VALUE) < ( 1048576 * 2 ) ? 21 : (VALUE) < ( 1048576 * 4 ) ? 22 : (VALUE) < ( 1048576 * 8 ) ? 23 : (VALUE) < ( 1048576 * 16 ) ? 24 : 25)
 
-
-module axi_spi_master 
+module axi_spi_master
 #(
     parameter AXI4_ADDRESS_WIDTH = 32,
     parameter AXI4_RDATA_WIDTH   = 32,
@@ -9,7 +18,7 @@ module axi_spi_master
     parameter AXI4_USER_WIDTH    = 4,
     parameter AXI4_ID_WIDTH      = 16,
     parameter BUFFER_DEPTH       = 8
-) 
+)
 (
     input  logic                          s_axi_aclk,
     input  logic                          s_axi_aresetn,
@@ -127,7 +136,7 @@ module axi_spi_master
         end
     end
 
-    spi_master_axi_if 
+    spi_master_axi_if
     #(
         .AXI4_ADDRESS_WIDTH(AXI4_ADDRESS_WIDTH),
         .AXI4_RDATA_WIDTH(AXI4_RDATA_WIDTH),
@@ -199,7 +208,7 @@ module axi_spi_master
         .spi_data_rx_ready(spi_data_rx_ready)
     );
 
-    spi_master_fifo 
+    spi_master_fifo
     #(
         .DATA_WIDTH(32),
         .BUFFER_DEPTH(BUFFER_DEPTH)
@@ -221,7 +230,7 @@ module axi_spi_master
         .ready_o(spi_data_tx_ready)
     );
 
-    spi_master_fifo 
+    spi_master_fifo
     #(
         .DATA_WIDTH(32),
         .BUFFER_DEPTH(BUFFER_DEPTH)
