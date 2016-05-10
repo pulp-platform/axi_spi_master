@@ -25,91 +25,105 @@ module spi_master_tx
     input  logic [31:0] data,
     input  logic        data_valid,
     output logic        data_ready,
-    output logic        fifo_sync
+    output logic        clk_en_o
 );
 
-    logic [31:0] data_int;
-    logic [31:0] data_int_next;
-    logic [15:0] counter;
-    logic [15:0] counter_trgt;
-    logic [15:0] counter_next;
-    logic [15:0] counter_trgt_next;
-    logic        done;
-    logic        running;
+  logic [31:0] data_int;
+  logic [31:0] data_int_next;
+  logic [15:0] counter;
+  logic [15:0] counter_trgt;
+  logic [15:0] counter_next;
+  logic [15:0] counter_trgt_next;
+  logic        done;
+  logic        reg_done;
 
-    assign sdo0 = (en_quad_in) ? data_int[28] : data_int[31];
-    assign sdo1 = data_int[29];
-    assign sdo2 = data_int[30];
-    assign sdo3 = data_int[31];
+  enum logic [1:0] { IDLE, TRANSMIT } tx_CS, tx_NS;
 
-    assign tx_done = done;
+  assign sdo0 = (en_quad_in) ? data_int[28] : data_int[31];
+  assign sdo1 = data_int[29];
+  assign sdo2 = data_int[30];
+  assign sdo3 = data_int[31];
 
-    assign fifo_sync = (tx_edge && ((counter == counter_trgt-1) || (!en_quad_in && (counter[4:0] == 5'b11111)) || (en_quad_in && (counter[2:0] == 3'b111)))) ? 1'b1 : 1'b0;
+  assign tx_done = done;
 
-    always_comb
-    begin
-        if (counter_in_upd)
-            counter_trgt_next = (en_quad_in) ? {2'b00,counter_in[15:2]} : counter_in;
-        else
-            counter_trgt_next = counter_trgt;
+  assign reg_done  = (!en_quad_in && (counter[4:0] == 5'b11111)) || (en_quad_in && (counter[2:0] == 3'b111));
 
-        if (counter == counter_trgt-1)
-            done = 1'b1 & tx_edge;
-        else
-            done = 1'b0;
+  always_comb
+  begin
+    if (counter_in_upd)
+      counter_trgt_next = (en_quad_in) ? {2'b00,counter_in[15:2]} : counter_in;
+    else
+      counter_trgt_next = counter_trgt;
+  end
 
-        if (tx_edge)
-            if (counter == counter_trgt-1)
-                    counter_next = 0;
-            else if (en)
-                    counter_next = counter + 1;
-            else
-                    counter_next = counter;
-        else
-            counter_next = counter;
+  assign done = (counter == counter_trgt-1) && tx_edge;
 
-        if (tx_edge)
-            if (data_valid && ((counter == counter_trgt-1) || (!en_quad_in && (counter[4:0] == 5'b11111)) || (en_quad_in && (counter[2:0] == 3'b111))))
-            begin
-                data_int_next = data;
-                data_ready    = 1'b1;
-            end
-            else
-            begin
-                data_ready    = 1'b0;
-                data_int_next = (en_quad_in) ? {data_int[27:0],4'b0000} : {data_int[30:0],1'b0};
-            end
-        else if (data_valid && ~running)
-            begin
-                data_ready    = 1'b1;
-                data_int_next = data;
-            end
-            else
-            begin
-                data_ready    = 1'b0;
-                data_int_next = data_int;
-            end
-    end
+  always_comb
+  begin
+    tx_NS         = tx_CS;
+    clk_en_o      = 1'b0;
+    data_int_next = data_int;
+    data_ready    = 1'b0;
+    counter_next  = counter;
 
+    case (tx_CS)
+      IDLE: begin
+        clk_en_o = 1'b0;
 
-    always_ff @(posedge clk, negedge rstn)
-    begin
-        if (rstn == 0)
-        begin
-            counter      <= 0;
-            counter_trgt <= 'h8;
-            data_int     <= 'h0;
-            running      <= 0;
+        if (en && data_valid) begin
+          data_int_next = data;
+          data_ready    = 1'b1;
+          tx_NS         = TRANSMIT;
         end
-        else
-        begin
-            if (counter_in_upd)
-                    running <= 1;
-            else if (done)
-                    running <= 0;
-            counter      <= counter_next;
-            counter_trgt <= counter_trgt_next;
-            data_int     <= data_int_next;
+      end
+
+      TRANSMIT: begin
+        clk_en_o = 1'b1;
+
+        if (tx_edge) begin
+          counter_next = counter + 1;
+          data_int_next = (en_quad_in) ? {data_int[27:0],4'b0000} : {data_int[30:0],1'b0};
+
+          if (tx_done) begin
+            counter_next = 0;
+
+            if (en && data_valid) begin
+              data_int_next = data;
+              data_ready    = 1'b1;
+              tx_NS         = TRANSMIT;
+            end else begin
+              clk_en_o = 1'b0;
+              tx_NS    = IDLE;
+            end
+          end else if (reg_done) begin
+            if (data_valid) begin
+              data_int_next = data;
+              data_ready    = 1'b1;
+            end else begin
+              clk_en_o = 1'b0;
+              tx_NS    = IDLE;
+            end
+          end
         end
+      end
+    endcase
+  end
+
+  always_ff @(posedge clk, negedge rstn)
+  begin
+    if (~rstn)
+    begin
+      counter      <= 0;
+      counter_trgt <= 'h8;
+      data_int     <= 'h0;
+      tx_CS        <= IDLE;
     end
+    else
+    begin
+      counter      <= counter_next;
+      counter_trgt <= counter_trgt_next;
+      data_int     <= data_int_next;
+      tx_CS        <= tx_NS;
+    end
+  end
 endmodule
