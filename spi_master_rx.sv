@@ -23,7 +23,9 @@ module spi_master_rx
     input  logic [15:0] counter_in,
     input  logic        counter_in_upd,
     output logic [31:0] data,
-    output logic        data_valid
+    input  logic        data_ready,
+    output logic        data_valid,
+    output logic        clk_en_o
 );
 
   logic [31:0] data_int;
@@ -33,9 +35,13 @@ module spi_master_rx
   logic [15:0] counter_next;
   logic [15:0] counter_trgt_next;
   logic        done;
+  logic        reg_done;
+  enum logic [1:0] { IDLE, RECEIVE, WAIT_FIFO, WAIT_FIFO_DONE } rx_CS, rx_NS;
+
+
+  assign reg_done  = (!en_quad_in && (counter[4:0] == 5'b11111)) || (en_quad_in && (counter[2:0] == 3'b111));
 
   assign data = data_int_next;
-  assign data_valid = rx_edge & (done | (en & (~en_quad_in & (counter[4:0] == 5'b11111)) | (en_quad_in & (counter[2:0] == 3'b111))));
   assign rx_done = done;
 
   always_comb
@@ -44,34 +50,71 @@ module spi_master_rx
       counter_trgt_next = (en_quad_in) ? {2'b00,counter_in[15:2]} : counter_in;
     else
       counter_trgt_next = counter_trgt;
+  end
 
-    if (counter == counter_trgt-1)
-      done = 1'b1 & rx_edge;
-    else
-      done = 1'b0;
+  assign done = (counter == counter_trgt-1) && rx_edge;
 
-    if (rx_edge)
-      if (counter == counter_trgt-1)
-          counter_next = 0;
-      else if (en)
-        counter_next = counter + 1;
-       else
-        counter_next = counter;
-    else
-      counter_next = counter;
+  always_comb
+  begin
+    rx_NS         = rx_CS;
+    clk_en_o      = 1'b0;
+    data_int_next = data_int;
+    data_valid    = 1'b0;
+    counter_next  = counter;
 
+    case (rx_CS)
+      IDLE: begin
+        clk_en_o = 1'b0;
 
-    if (rx_edge)
-    begin
-      if (en_quad_in)
-        data_int_next = {data_int[27:0],sdi3,sdi2,sdi1,sdi0};
-      else
-        data_int_next = {data_int[30:0],sdi0};
-    end
-    else
-    begin
-      data_int_next = data_int;
-    end
+        // check first if there is available space instead of later
+        if (en) begin
+          rx_NS = RECEIVE;
+        end
+      end
+
+      RECEIVE: begin
+        clk_en_o = 1'b1;
+
+        if (rx_edge) begin
+          counter_next = counter + 1;
+
+          if (en_quad_in)
+            data_int_next = {data_int[27:0],sdi3,sdi2,sdi1,sdi0};
+          else
+            data_int_next = {data_int[30:0],sdi0};
+
+          if (rx_done) begin
+            counter_next = 0;
+            data_valid   = 1'b1;
+
+            if (data_ready)
+              rx_NS = IDLE;
+            else
+              rx_NS = WAIT_FIFO_DONE;
+          end else if (reg_done) begin
+            data_valid = 1'b1;
+
+            if (~data_ready) begin
+              // no space in the FIFO, wait for free space
+              clk_en_o = 1'b0;
+              rx_NS    = WAIT_FIFO;
+            end
+          end
+        end
+      end
+
+      WAIT_FIFO_DONE: begin
+        data_valid = 1'b1;
+        if (data_ready)
+          rx_NS = IDLE;
+      end
+
+      WAIT_FIFO: begin
+        data_valid = 1'b1;
+        if (data_ready)
+          rx_NS = RECEIVE;
+      end
+    endcase
   end
 
 
@@ -81,13 +124,15 @@ module spi_master_rx
     begin
       counter      <= 0;
       counter_trgt <= 'h8;
-      data_int     <= 'h0;
+      data_int     <= '0;
+      rx_CS        <= IDLE;
     end
     else
     begin
       counter      <= counter_next;
       counter_trgt <= counter_trgt_next;
       data_int     <= data_int_next;
+      rx_CS        <= rx_NS;
     end
   end
 

@@ -37,7 +37,7 @@ module spi_master_tx
   logic        done;
   logic        reg_done;
 
-  enum logic [1:0] { IDLE, TRANSMIT } tx_CS, tx_NS;
+  enum logic [0:0] { IDLE, TRANSMIT } tx_CS, tx_NS;
 
   assign sdo0 = (en_quad_in) ? data_int[28] : data_int[31];
   assign sdo1 = data_int[29];

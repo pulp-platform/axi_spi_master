@@ -87,6 +87,7 @@ module spi_master_controller
   logic spi_cs;
 
   logic tx_clk_en;
+  logic rx_clk_en;
 
   enum logic [2:0] {DATA_NULL,DATA_EMPTY,DATA_CMD,DATA_ADDR,DATA_FIFO} ctrl_data_mux;
 
@@ -141,7 +142,9 @@ module spi_master_controller
     .counter_in     ( counter_rx             ),
     .counter_in_upd ( counter_rx_valid       ),
     .data           ( spi_ctrl_data_rx       ),
-    .data_valid     ( spi_ctrl_data_rx_valid )
+    .data_valid     ( spi_ctrl_data_rx_valid ),
+    .data_ready     ( spi_ctrl_data_rx_ready ),
+    .clk_en_o       ( rx_clk_en              )
   );
 
   always_comb
@@ -483,32 +486,30 @@ module spi_master_controller
       DATA_RX:
       begin
         spi_status[6] = 1'b1;
-        spi_cs = 1'b0;
-        spi_clock_en = 1'b1;
-        s_spi_mode = (en_quad) ? `SPI_QUAD_RX : `SPI_STD;
-        if (rx_done)
-        begin
+        spi_cs        = 1'b0;
+        spi_clock_en  = rx_clk_en;
+        s_spi_mode    = (en_quad) ? `SPI_QUAD_RX : `SPI_STD;
+
+        if (rx_done) begin
           state_next = WAIT_EDGE;
-        end
-        else
-        begin
-          spi_en_rx        = 1'b1;
+        end else begin
+          spi_en_rx  = 1'b1;
           state_next = DATA_RX;
         end
       end
       WAIT_EDGE:
       begin
         spi_status[6] = 1'b1;
-        spi_cs = 1'b0;
-        spi_clock_en = 1'b0;
-        s_spi_mode = (en_quad) ? `SPI_QUAD_RX : `SPI_STD;
-        if (spi_fall)
-        begin
+        spi_cs        = 1'b0;
+        spi_clock_en  = 1'b0;
+        s_spi_mode    = (en_quad) ? `SPI_QUAD_RX : `SPI_STD;
+
+        if (spi_fall) begin
           eot        = 1'b1;
           state_next = IDLE;
-        end
-        else
+        end else begin
           state_next = WAIT_EDGE;
+        end
       end
     endcase
   end
