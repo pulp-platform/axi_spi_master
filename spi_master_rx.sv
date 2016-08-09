@@ -81,7 +81,7 @@ module spi_master_rx
           if (en_quad_in)
             data_int_next = {data_int[27:0],sdi3,sdi2,sdi1,sdi0};
           else
-            data_int_next = {data_int[30:0],sdi0};
+            data_int_next = {data_int[30:0],sdi1};
 
           if (rx_done) begin
             counter_next = 0;
