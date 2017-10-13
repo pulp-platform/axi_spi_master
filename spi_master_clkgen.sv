@@ -27,7 +27,9 @@ module spi_master_clkgen
 
     logic       spi_clk_next;
     logic       running;
-
+    logic       en_i;
+    
+    
     always_comb
     begin
             spi_rise = 1'b0;
@@ -43,7 +45,7 @@ module spi_master_clkgen
                 spi_clk_next = ~spi_clk;
                 if(spi_clk == 1'b0)
                     spi_rise = running;
-                else
+                else 
                     spi_fall = running;
             end
             else
@@ -51,7 +53,9 @@ module spi_master_clkgen
                 counter_next = counter + 1;
                 spi_clk_next = spi_clk;
             end
+     
     end
+
 
     always_ff @(posedge clk, negedge rstn)
     begin
@@ -61,11 +65,13 @@ module spi_master_clkgen
             counter      <= 'h0;
             spi_clk      <= 1'b0;
             running      <= 1'b0;
+            en_i <= 1'b0;
         end
         else
         begin
+            en_i <= en;
             counter_trgt <= counter_trgt_next;
-            if ( !((spi_clk==1'b0)&&(~en)) )
+            if ( !((spi_clk==1'b0)&&(~en_i)) )
             begin
                 running <= 1'b1;
                 spi_clk <= spi_clk_next;
